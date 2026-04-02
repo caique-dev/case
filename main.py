@@ -16,4 +16,5 @@ def teste_1():
 
     print(infos_consolidadas)
 
+    infos_consolidadas.to_excel('./consolidated_data.xlsx', index=False)
 teste_1()
