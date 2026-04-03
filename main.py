@@ -110,7 +110,7 @@ def teste_1():
     etapa_a(arquivo_fonte, arquivo_destino, param_aba_destino='consolidated_data')
     etapa_b(arquivo_destino, param_aba_destino='top_5')
 
-# teste 2: análise de dados
+# teste 2: análise de retorno diário
 def teste_2():
     def etapa_a(param_fonte: str, param_aba_destino: str):
         # importando dados
@@ -125,7 +125,7 @@ def teste_2():
         # calculando retorno diário de cada papel
         df['return'] = df.groupby('Papel')['Preço'].pct_change()
 
-        # formatando a coluna de data para o formato brasileiro, para não poluir o excel
+        # formatando novamente a coluna de data para o formato brasileiro, para não poluir o excel
         df['Data'] = df['Data'].dt.strftime('%d/%m/%Y')
 
         # sobrescrevendo aba com os dados atualizados
@@ -133,6 +133,24 @@ def teste_2():
         inserir_df_na_aba(ws, df)
         wb.save(param_fonte)
 
+    def etapa_b(param_fonte: str, param_aba_fonte: str, destino_imagem: str):
+        # importando dados
+        df = pd.read_excel(param_fonte, sheet_name=param_aba_fonte)
+
+        df.set_index('Data', inplace=True)
+
+        # calculando o retorno acumulado do top 5
+        df['return_acumulado'] = (
+            (1 + df['return'])
+            .groupby(df['Papel'])
+            .cumprod()
+            - 1
+        )
+
+        print(df)
+
+
     etapa_a(arquivo_destino, param_aba_destino='top_5')
+    etapa_b(arquivo_destino, param_aba_fonte='top_5', destino_imagem='consolited.png')
 teste_1()
 teste_2()
