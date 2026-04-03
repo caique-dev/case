@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
+import matplotlib.pyplot as plt
 
 # definindo enderecos dos arquivos utilizados
 arquivo_fonte = './Data.xlsx'
@@ -137,19 +138,30 @@ def teste_2():
         # importando dados
         df = pd.read_excel(param_fonte, sheet_name=param_aba_fonte)
 
-        df.set_index('Data', inplace=True)
+        # df.set_index('Data', inplace=True)
 
         # calculando o retorno acumulado do top 5
         df['return_acumulado'] = (
             (1 + df['return'])
-            .groupby(df['Papel'])
+            .groupby(df['Papel']) # agrupando por papel
             .cumprod()
             - 1
         )
 
-        print(df)
+        # plotando gráfico
+        ## para plotar o gráfico, é necessário que o retorno acumulado de cada papel seja uma coluna diferente, então é necessário pivotar o df para que ele volte ao formato wide, utilizado no primeiro teste
+        df_pivot = df.pivot(index='Data', columns='Papel', values='return_acumulado')
+        ## configurando o gráfico
+        df_pivot.plot(figsize=(10,6))
+        plt.title('Retorno Acumulado do Top 5')
+        plt.xlabel('Data')
+        plt.ylabel('Retorno Acumulado')
+        plt.legend(title='Papel')
+        plt.savefig(destino_imagem)
+        # para mostrar o gráfico na tela, descomente a linha abaixo
+        # plt.show()
 
-
+    # executando as etapas
     etapa_a(arquivo_destino, param_aba_destino='top_5')
     etapa_b(arquivo_destino, param_aba_fonte='top_5', destino_imagem='consolited.png')
 teste_1()
