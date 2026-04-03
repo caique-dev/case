@@ -4,8 +4,8 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 
 # definindo enderecos dos arquivos utilizados
-fonte = './Data.xlsx'
-destino = './consolidated_data.xlsx'
+arquivo_fonte = './Data.xlsx'
+arquivo_destino = './consolidated_data.xlsx'
 
 # funções de uso geral
 def abrir_ou_criar_planilha(caminho_arquivo: str, nome_aba: str):
@@ -27,7 +27,7 @@ def abrir_ou_criar_planilha(caminho_arquivo: str, nome_aba: str):
 
     return wb, ws
 
-def inserir_df_na_aba(ws: any, df: pd.DataFrame, incluir_header: bool = True, incluir_index: bool = True):
+def inserir_df_na_aba(ws: any, df: pd.DataFrame, incluir_header: bool = True, incluir_index: bool = False):
     """
     ws: worksheet do openpyxl
     df: pandas DataFrame
@@ -45,34 +45,34 @@ def inserir_df_na_aba(ws: any, df: pd.DataFrame, incluir_header: bool = True, in
         for c_idx, value in enumerate(row, start=1): # colunas
             ws.cell(row=r_idx, column=c_idx, value=value)
 
-# teste 1: consolidar os dados de cada aba em um único arquivo
+# teste 1: estruturação de dados
 def teste_1():
-    todas_abas = pd.read_excel(fonte, sheet_name=None)
-    aux = []
+    # etapa A: consolidando os dados brutos em uma única aba
+    def etapa_a(param_fonte: str, param_destino: str):
+        # transformando o arquivo fonte em um dict onde as chaves são os nomes das abas e os valores são os dataframes correspondentes a cada aba
+        todas_abas = pd.read_excel(param_fonte, sheet_name=None) # sheet_name=None retorna um dicionário onde as chaves são os nomes das abas e os valores são os dataframes correspondentes a cada aba
+        aux = []
 
-    # gerando um df com os dados de cada aba, alterando a coluna "Preço" para o nome da aba/papel correspondente
-    for nome_aba, df in todas_abas.items():
-        df = df.rename(columns={'Preço': f'{nome_aba}'})
-        aux.append(df)
+        # gerando dfs com os dados de cada aba, mantendo a aba "Data" e alterando a coluna "Preço" para o nome da aba correspondente
+        for nome_aba, df in todas_abas.items():
+            df = df.rename(columns={'Preço': f'{nome_aba}'})
+            aux.append(df)
 
-    # pegando os dados da primeira aba para iniciar a consolidação
-    infos_consolidadas = aux[0] 
-    for df in aux[1:]:
-        # unindo os dados dados das abas seguintes, utilizando a coluna "Data" como chave de junção
-        infos_consolidadas = pd.merge(infos_consolidadas, df, on='Data', how='inner')
+        # pegando os dados da primeira aba para iniciar a consolidação
+        infos_consolidadas = aux[0] 
+        for df in aux[1:]:
+            # unindo os dados dados das abas seguintes, utilizando a coluna "Data" como chave de junção
+            infos_consolidadas = pd.merge(infos_consolidadas, df, on='Data', how='inner')
 
-    # definindo a coluna "Data" como índice para facilitar o acesso aos 
-    # infos_consolidadas = infos_consolidadas.set_index('Data')
+        # guardando a consolidação no excel de destino
+        wb, ws = abrir_ou_criar_planilha(param_destino, 'consolidated_data')
+        inserir_df_na_aba(ws, infos_consolidadas)
+        wb.save(param_destino)
 
-    # guardando a consolidação no excel de destino
-    wb, ws = abrir_ou_criar_planilha('./consolidated_data1.xlsx', 'consolidated_data')
-    inserir_df_na_aba(ws, infos_consolidadas,incluir_index=False)
-    wb.save('./consolidated_data1.xlsx')
-
-    # teste 1.1: calcular o retorno diário de cada papel
-    def teste_1_1():
+    # etapa B: calculando o retorno diário de cada papel
+    def etapa_b(param_data:str):
         # lendo o arquivo consolidado
-        df_precos = pd.read_excel(destino) 
+        df_precos = pd.read_excel(param_data) 
 
         # definindo a coluna "Data" como índice para facilitar o cálculo do retorno diário
         df_precos = df_precos.set_index('Data') 
@@ -80,7 +80,7 @@ def teste_1():
         # calculando os retornos e adicionando prefixos às colunas facilitar na concatenção dos df
         df_retornos = df_precos.pct_change().add_prefix('Retorno_')
 
-        # unindo retornos e precos em um único df
+        # unindo retornos e precos em um único df através da concatenação horizontal, utilizando a coluna "Data" como índice para alinhar os dados
         df_final = pd.concat([df_precos, df_retornos], axis=1)
 
         # organizando as colunas para que os retornos fiquem ao lado dos preços correspondentes
@@ -91,10 +91,17 @@ def teste_1():
 
         df_final = df_final[colunas_organizadas]
 
-        return df_final
-    # infos_consolidadas = teste_1_1()
+        # resetando o índice para que a coluna "Data" volte a ser uma coluna normal, facilitando a exportação para o excel
+        df_final = df_final.reset_index()
 
-    # infos_consolidadas.to_excel(destino, index=True) # guardando o df final com preços e retornos em um excel
+        # salvando o df final com preços e retornos no excel de destino
+        wb, ws = abrir_ou_criar_planilha(param_data, 'consolidated_data')
+        inserir_df_na_aba(ws, df_final)
+        wb.save(param_data)
+    
+    # executando as etapas
+    etapa_a(arquivo_fonte, arquivo_destino)
+    etapa_b(arquivo_destino)
 
 # def teste_2():
 
