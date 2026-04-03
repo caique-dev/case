@@ -48,7 +48,7 @@ def inserir_df_na_aba(ws: any, df: pd.DataFrame, incluir_header: bool = True, in
 # teste 1: estruturação de dados
 def teste_1():
     # etapa A: consolidando os dados brutos em uma única aba
-    def etapa_a(param_fonte: str, param_destino: str):
+    def etapa_a(param_fonte: str, param_destino: str, param_aba_destino: str):
         # transformando o arquivo fonte em um dict onde as chaves são os nomes das abas e os valores são os dataframes correspondentes a cada aba
         todas_abas = pd.read_excel(param_fonte, sheet_name=None) # sheet_name=None retorna um dicionário onde as chaves são os nomes das abas e os valores são os dataframes correspondentes a cada aba
         aux = []
@@ -65,43 +65,40 @@ def teste_1():
             infos_consolidadas = pd.merge(infos_consolidadas, df, on='Data', how='inner')
 
         # guardando a consolidação no excel de destino
-        wb, ws = abrir_ou_criar_planilha(param_destino, 'consolidated_data')
+        wb, ws = abrir_ou_criar_planilha(param_destino, param_aba_destino)
         inserir_df_na_aba(ws, infos_consolidadas)
         wb.save(param_destino)
 
     # etapa B: calculando o retorno diário de cada papel
-    def etapa_b(param_data:str):
+    def etapa_b(param_fonte:str, param_aba_destino: str = ''):
         # lendo o arquivo consolidado
-        df_precos = pd.read_excel(param_data) 
+        df_precos = pd.read_excel(param_fonte) 
 
         # definindo a coluna "Data" como índice para facilitar o cálculo do retorno diário
         df_precos = df_precos.set_index('Data') 
         
-        # calculando os retornos e adicionando prefixos às colunas facilitar na concatenção dos df
-        df_retornos = df_precos.pct_change().add_prefix('Retorno_')
+        # calculando os retornos diários dos papéis
+        df_retornos = df_precos.pct_change()
 
-        # unindo retornos e precos em um único df através da concatenação horizontal, utilizando a coluna "Data" como índice para alinhar os dados
-        df_final = pd.concat([df_precos, df_retornos], axis=1)
+        # calculando o retorno diário médio de cada papel e ordenando a serie de forma decrescente
+        retorno_medio = df_retornos.mean().sort_values(ascending=False)
+        
+        # pegando os nomes dos 5 papéis com maior retorno médio
+        top_5 = retorno_medio.head(5).index.tolist()
 
-        # organizando as colunas para que os retornos fiquem ao lado dos preços correspondentes
-        colunas_organizadas = []
-        for coluna in df_precos.columns:
-            colunas_organizadas.append(coluna)
-            colunas_organizadas.append(f'Retorno_{coluna}')
-
-        df_final = df_final[colunas_organizadas]
+        # filtrando o top 5 no df de precos
+        df_final = df_precos[top_5]
 
         # resetando o índice para que a coluna "Data" volte a ser uma coluna normal, facilitando a exportação para o excel
         df_final = df_final.reset_index()
 
-        # salvando o df final com preços e retornos no excel de destino
-        wb, ws = abrir_ou_criar_planilha(param_data, 'consolidated_data')
+        # salvando o df final na aba top_5
+        wb, ws = abrir_ou_criar_planilha(param_fonte, param_aba_destino)
         inserir_df_na_aba(ws, df_final)
-        wb.save(param_data)
-    
+        wb.save(param_fonte)   
     # executando as etapas
-    etapa_a(arquivo_fonte, arquivo_destino)
-    etapa_b(arquivo_destino)
+    etapa_a(arquivo_fonte, arquivo_destino, param_aba_destino='consolidated_data')
+    etapa_b(arquivo_destino, param_aba_destino='top_5')
 
 # def teste_2():
 
