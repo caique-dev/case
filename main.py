@@ -48,6 +48,7 @@ def inserir_df_na_aba(ws: any, df: pd.DataFrame, incluir_header: bool = True, in
 # teste 1: estruturação de dados
 def teste_1():
     # etapa A: consolidando os dados brutos em uma única aba
+    ## utilizei o wide format na consolidação dos dados, onde cada papel tem uma coluna com seus preços, pois facilita a visualização e simplifica a tarefa, pois mantém o formato original dos dados
     def etapa_a(param_fonte: str, param_destino: str, param_aba_destino: str):
         # transformando o arquivo fonte em um dict onde as chaves são os nomes das abas e os valores são os dataframes correspondentes a cada aba
         todas_abas = pd.read_excel(param_fonte, sheet_name=None) # sheet_name=None retorna um dicionário onde as chaves são os nomes das abas e os valores são os dataframes correspondentes a cada aba
@@ -70,6 +71,7 @@ def teste_1():
         wb.save(param_destino)
 
     # etapa B: calculando o retorno diário de cada papel
+    ## Nesta etapa achei necessário alterar a tabela para o formato longo, onde cada linha representa o preço de um papel em uma data, tanto para me adequar melhor às exigências do teste 2A, que solicita a adição de apenas uma nova coluna, quanto para que a tabela fique menor, com apenas 3 colunas em vez de 11
     def etapa_b(param_fonte:str, param_aba_destino: str = ''):
         # lendo o arquivo consolidado
         df_precos = pd.read_excel(param_fonte) 
@@ -89,18 +91,23 @@ def teste_1():
         # filtrando o top 5 no df de precos
         df_final = df_precos[top_5]
 
-        # resetando o índice para que a coluna "Data" volte a ser uma coluna normal, facilitando a exportação para o excel
+        # resetando o índice para que a coluna "Data" volte a ser uma coluna normal, necessário para alterar o formato do df e para facilitar a exportação para o excel
         df_final = df_final.reset_index()
+
+        # alterando o formato do df para long
+        df_final = df_final.melt(
+            id_vars='Data',
+            var_name='Papel',
+            value_name='Preço'
+        )
 
         # salvando o df final na aba top_5
         wb, ws = abrir_ou_criar_planilha(param_fonte, param_aba_destino)
         inserir_df_na_aba(ws, df_final)
-        wb.save(param_fonte)   
+        wb.save(param_fonte)
+    
     # executando as etapas
     etapa_a(arquivo_fonte, arquivo_destino, param_aba_destino='consolidated_data')
     etapa_b(arquivo_destino, param_aba_destino='top_5')
-
-# def teste_2():
-
 
 teste_1()
