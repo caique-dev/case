@@ -110,4 +110,29 @@ def teste_1():
     etapa_a(arquivo_fonte, arquivo_destino, param_aba_destino='consolidated_data')
     etapa_b(arquivo_destino, param_aba_destino='top_5')
 
+# teste 2: análise de dados
+def teste_2():
+    def etapa_a(param_fonte: str, param_aba_destino: str):
+        # importando dados
+        df = pd.read_excel(param_fonte, sheet_name=param_aba_destino)
+
+        # garantindo o df está ordenado por papel e data, para que o cálculo do retorno diário seja feito corretamente
+        ## definindo a coluna "Data" como datetime para garantir a ordenação cronológica em vez da lexixográfica
+        df['Data'] = pd.to_datetime(df['Data'],dayfirst=True)
+        ## ordenando o df por papel e data
+        df = df.sort_values(by=['Papel', 'Data'])
+        
+        # calculando retorno diário de cada papel
+        df['return'] = df.groupby('Papel')['Preço'].pct_change()
+
+        # formatando a coluna de data para o formato brasileiro, para não poluir o excel
+        df['Data'] = df['Data'].dt.strftime('%d/%m/%Y')
+
+        # sobrescrevendo aba com os dados atualizados
+        wb, ws = abrir_ou_criar_planilha(param_fonte, param_aba_destino)
+        inserir_df_na_aba(ws, df)
+        wb.save(param_fonte)
+
+    etapa_a(arquivo_destino, param_aba_destino='top_5')
 teste_1()
+teste_2()
