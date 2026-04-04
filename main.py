@@ -3,6 +3,7 @@ import pandas as pd
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 import matplotlib.pyplot as plt
+import yfinance as yf
 
 # definindo enderecos dos arquivos utilizados
 arquivo_fonte = './Data.xlsx'
@@ -164,5 +165,62 @@ def teste_2():
     # executando as etapas
     etapa_a(arquivo_destino, param_aba_destino='top_5')
     etapa_b(arquivo_destino, param_aba_fonte='top_5', destino_imagem='consolited.png')
+
+# teste 3: análise de dados
+def teste_3():
+    def etapa_a(param_fonte: str, param_aba_fonte: str) -> pd.DataFrame:
+        # importando todos os dados do top 5
+        df = pd.read_excel(param_fonte, sheet_name=param_aba_fonte)
+
+        # extraindo uma lista com os nomes dos papéis
+        top_5 = list(df['Papel'].unique()) 
+
+        # transformando a coluna data para datetime
+        df['Data'] = pd.to_datetime(df['Data'],dayfirst=True)
+        
+        # extraindo o período da apuração
+        periodo_inicio = df['Data'].min()
+        periodo_fim = df['Data'].max()
+
+        # baixando dados históricos dos papéis pela api
+        df_api = yf.download(top_5, start=periodo_inicio, end=periodo_fim)['Close']
+
+        # retornado resultados
+        return df_api
+    
+    def teste_b(param_df_api: pd.DataFrame, param_fonte: str, param_aba_fonte: str, param_tolerancia: float = 1e-6):
+        # importando dados do excel
+        df_excel = pd.read_excel(param_fonte, sheet_name=param_aba_fonte)
+
+        # tranformando o df da api para o formato longo, mesmo formado do df do excel
+        param_df_api = param_df_api.reset_index().melt(
+            id_vars='Date', 
+            var_name='Papel', 
+            value_name='Preço'
+        ).rename(columns={'Date': 'Data'})
+
+        # selecionando apenas as colunas relevantes para a comparação dos dados
+        df_excel = df_excel[['Data', 'Papel', 'Preço']]
+
+        # transformando a coluna data para datetime
+        df_excel['Data'] = pd.to_datetime(df_excel['Data'],dayfirst=True)
+
+        
+        
+        # verificando diferenças entre dados fornecidos e dados da api
+        ## fazendo um merge entre os dois dfs para garantir o alinhamento das tuplas (Papel, Data), pois a comparação entre os dois será feita linha a linha
+        df_merged = df_excel.merge(
+            param_df_api,
+            on=['Data', 'Papel'],
+            how='inner',
+            suffixes=('_excel', '_api')
+        )
+        ## verificando quais linhas são "diferentes o suficiente" para serem consideradas como erradas
+        mask_linhas_diferentes = abs(df_merged['Preço_excel'] - df_merged['Preço_api']) > param_tolerancia
+
+
+    df_api = etapa_a(arquivo_destino, param_aba_fonte='top_5')
+    teste_b(df_api, arquivo_destino, param_aba_fonte='top_5')
 teste_1()
 teste_2()
+teste_3()
