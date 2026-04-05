@@ -10,7 +10,7 @@ arquivo_fonte = './Data.xlsx'
 arquivo_destino = './consolidated_data.xlsx'
 
 # funções de uso geral
-def abrir_ou_criar_planilha(caminho_arquivo: str, nome_aba: str):
+def abrir_ou_criar_planilha(caminho_arquivo: str, nome_aba: str) -> tuple[Workbook, any]:
     # verifica se o arquivo existe
     if os.path.exists(caminho_arquivo):
         wb = load_workbook(caminho_arquivo)
@@ -30,12 +30,6 @@ def abrir_ou_criar_planilha(caminho_arquivo: str, nome_aba: str):
     return wb, ws
 
 def inserir_df_na_aba(ws: any, df: pd.DataFrame, incluir_header: bool = True, incluir_index: bool = False):
-    """
-    ws: worksheet do openpyxl
-    df: pandas DataFrame
-    incluir_header (bool): inclui nomes das colunas
-    incluir_index (bool): inclui índice do DataFrame
-    """
     # limpando possiveis dados existentes na aba
     ws.delete_rows(1, ws.max_row)
 
@@ -52,7 +46,7 @@ def teste_1():
     # etapa A: consolidando os dados brutos em uma única aba
     ## utilizei o wide format na consolidação dos dados, onde cada papel tem uma coluna com seus preços, pois facilita a visualização e simplifica a tarefa, pois mantém o formato original dos dados
     def etapa_a(param_fonte: str, param_destino: str, param_aba_destino: str):
-        # transformando o arquivo fonte em um dict onde as chaves são os nomes das abas e os valores são os dataframes correspondentes a cada aba
+        # transformando o arquivo fonte em um dicionário onde as chaves são os nomes das abas e os valores são os dataframes correspondentes a cada aba
         todas_abas = pd.read_excel(param_fonte, sheet_name=None) # sheet_name=None retorna um dicionário onde as chaves são os nomes das abas e os valores são os dataframes correspondentes a cada aba
         aux = []
 
@@ -72,8 +66,9 @@ def teste_1():
         inserir_df_na_aba(ws, infos_consolidadas)
         wb.save(param_destino)
 
-    # etapa B: calculando o retorno diário de cada papel
-    ## Nesta etapa achei necessário alterar a tabela para o formato longo, onde cada linha representa o preço de um papel em uma data, tanto para me adequar melhor às exigências do teste 2A, que solicita a adição de apenas uma nova coluna, quanto para que a tabela fique menor, com apenas 3 colunas em vez de 11
+    # etapa B: calculando o retorno diário médio de cada papel
+    ## nesta etapa foi necessário mudar o formato do df e da tabela resultante em relação à etapa anterior, aumentando o número de linhas em vez de adicionar mais colunas. agora, cada linha representa o preço de um papel em uma data
+    ## esta alteração deixa a tabela resultante menor, com apenas 3 colunas em vez de 11, e facilita a execução da etapa 2A
     def etapa_b(param_fonte:str, param_aba_destino: str = ''):
         # lendo o arquivo consolidado
         df_precos = pd.read_excel(param_fonte) 
@@ -152,7 +147,7 @@ def teste_2():
         )
 
         # plotando gráfico
-        ## para plotar o gráfico, é necessário que o retorno acumulado de cada papel seja uma coluna diferente, então é necessário pivotar o df para que ele volte ao formato wide, utilizado no primeiro teste
+        ## para plotar o gráfico, é necessário que o retorno acumulado de cada papel seja uma coluna diferente, então é necessário pivotar o df para que ele volte ao formato wide
         df_pivot = df.pivot(index='Data', columns='Papel', values='return_acumulado')
         ## configurando o gráfico
         df_pivot.plot(figsize=(10,6))
@@ -161,12 +156,11 @@ def teste_2():
         plt.ylabel('Retorno Acumulado')
         plt.legend(title='Papel')
         plt.savefig(destino_imagem)
-        # para mostrar o gráfico na tela, descomente a linha abaixo
         # plt.show()
 
     # executando as etapas
     etapa_a(arquivo_destino, param_aba_destino='top_5')
-    etapa_b(arquivo_destino, param_aba_fonte='top_5', destino_imagem='consolited.png')
+    etapa_b(arquivo_destino, param_aba_fonte='top_5', destino_imagem='cumulative_returns.png')
 
 # teste 3: análise de dados
 def teste_3():
@@ -192,8 +186,8 @@ def teste_3():
         # retornado resultados
         return df_api
     
-    # etapa B: comparando os dados do excel com os dados da api e salvando as diferenças significativas no excel
-    ## nesta etapa, defini que diferenças entre o preço do excel e o preço da api iguais ou menores que 1e-6, cerca de um décimo de milésimo de centavo, como irrelevantes, ou seja, apenas diferenças maiores que isso serão consideradas como erros e salvas no excel. Essa tolerância é necessária para evitar que pequenas diferenças de formatação ou imprecisões de ponto flutuante sejam consideradas como erros
+    # etapa B: comparando os dados da aba do top 5 com os dados da api e salvando as diferenças significativas no excel
+    ## nesta etapa, defini que diferenças entre o preço do excel e o preço da api iguais ou menores que 1e-6, cerca de um décimo de milésimo de centavo, são irrelevantes, ou seja, apenas diferenças maiores que isso serão consideradas como erros e salvas no excel. Essa tolerância é necessária para evitar que pequenas diferenças de formatação ou imprecisões de ponto flutuante sejam consideradas como erros
     def etapa_b(
         param_df_api: pd.DataFrame,
         param_fonte: str, 
@@ -231,13 +225,16 @@ def teste_3():
         ## calculando a diferença percentual entre os preços do excel e da api
         df_linhas_diferentes['Módulo da Diferença Percentual'] = abs(df_linhas_diferentes['Preço_excel'] - df_linhas_diferentes['Preço_api']) / df_linhas_diferentes['Preço_api'] * 100
 
+        # formatando novamente a coluna de data para o formato brasileiro, para não poluir o excel
+        df_linhas_diferentes['Data'] = df_linhas_diferentes['Data'].dt.strftime('%d/%m/%Y')
+
         # salvando resultados
         if not df_linhas_diferentes.empty:
             wb, ws = abrir_ou_criar_planilha(param_fonte, param_aba_destino)
             inserir_df_na_aba(ws, df_linhas_diferentes)
             wb.save(param_fonte)
         else:
-            ## salvando na aba que não foram encontrados erros, para garantir que a etapa B foi executada e para facilitar a conferência dos dados, caso necessário
+            ## sinalizando na aba que não foram encontrados erros
             wb, ws = abrir_ou_criar_planilha(param_fonte, param_aba_destino)
             inserir_df_na_aba(ws, pd.DataFrame({'Mensagem': [f'Nenhuma diferença considerável(maior que {param_tolerancia}) entre preços os preços do excel e da API foi encontrada']}), incluir_header=False)
             wb.save(param_fonte)
