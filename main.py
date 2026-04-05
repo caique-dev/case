@@ -114,6 +114,7 @@ def teste_1():
 
 # teste 2: análise de retorno diário
 def teste_2():
+    # etapa A: calculando o retorno diário de cada papel e adicionando uma nova coluna "return" com os retornos diários
     def etapa_a(param_fonte: str, param_aba_destino: str):
         # importando dados
         df = pd.read_excel(param_fonte, sheet_name=param_aba_destino)
@@ -135,6 +136,7 @@ def teste_2():
         inserir_df_na_aba(ws, df)
         wb.save(param_fonte)
 
+    # etapa B: calculando o retorno acumulado do top 5 e plotando um gráfico com a evolução dos respectivos retornos acumulados
     def etapa_b(param_fonte: str, param_aba_fonte: str, destino_imagem: str):
         # importando dados
         df = pd.read_excel(param_fonte, sheet_name=param_aba_fonte)
@@ -168,6 +170,8 @@ def teste_2():
 
 # teste 3: análise de dados
 def teste_3():
+
+    # etapa A: baixando dados históricos dos papéis pela api
     def etapa_a(param_fonte: str, param_aba_fonte: str) -> pd.DataFrame:
         # importando todos os dados do top 5
         df = pd.read_excel(param_fonte, sheet_name=param_aba_fonte)
@@ -188,7 +192,15 @@ def teste_3():
         # retornado resultados
         return df_api
     
-    def teste_b(param_df_api: pd.DataFrame, param_fonte: str, param_aba_fonte: str, param_tolerancia: float = 1e-6):
+    # etapa B: comparando os dados do excel com os dados da api e salvando as diferenças significativas no excel
+    ## nesta etapa, defini que diferenças entre o preço do excel e o preço da api iguais ou menores que 1e-6, cerca de um décimo de milésimo de centavo, como irrelevantes, ou seja, apenas diferenças maiores que isso serão consideradas como erros e salvas no excel. Essa tolerância é necessária para evitar que pequenas diferenças de formatação ou imprecisões de ponto flutuante sejam consideradas como erros
+    def etapa_b(
+        param_df_api: pd.DataFrame,
+        param_fonte: str, 
+        param_aba_fonte: str,
+        param_aba_destino: str = 'erros',
+        param_tolerancia: float = 1e-6
+    ):
         # importando dados do excel
         df_excel = pd.read_excel(param_fonte, sheet_name=param_aba_fonte)
 
@@ -204,8 +216,6 @@ def teste_3():
 
         # transformando a coluna data para datetime
         df_excel['Data'] = pd.to_datetime(df_excel['Data'],dayfirst=True)
-
-        
         
         # verificando diferenças entre dados fornecidos e dados da api
         ## fazendo um merge entre os dois dfs para garantir o alinhamento das tuplas (Papel, Data), pois a comparação entre os dois será feita linha a linha
@@ -215,12 +225,28 @@ def teste_3():
             how='inner',
             suffixes=('_excel', '_api')
         )
-        ## verificando quais linhas são "diferentes o suficiente" para serem consideradas como erradas
+        ## verificando quais linhas são "diferentes o suficiente" para serem consideradas erradas
         mask_linhas_diferentes = abs(df_merged['Preço_excel'] - df_merged['Preço_api']) > param_tolerancia
+        df_linhas_diferentes = df_merged[mask_linhas_diferentes]
+        ## calculando a diferença percentual entre os preços do excel e da api
+        df_linhas_diferentes['Módulo da Diferença Percentual'] = abs(df_linhas_diferentes['Preço_excel'] - df_linhas_diferentes['Preço_api']) / df_linhas_diferentes['Preço_api'] * 100
 
+        # salvando resultados
+        if not df_linhas_diferentes.empty:
+            wb, ws = abrir_ou_criar_planilha(param_fonte, param_aba_destino)
+            inserir_df_na_aba(ws, df_linhas_diferentes)
+            wb.save(param_fonte)
+        else:
+            ## salvando na aba que não foram encontrados erros, para garantir que a etapa B foi executada e para facilitar a conferência dos dados, caso necessário
+            wb, ws = abrir_ou_criar_planilha(param_fonte, param_aba_destino)
+            inserir_df_na_aba(ws, pd.DataFrame({'Mensagem': [f'Nenhuma diferença considerável(maior que {param_tolerancia}) entre preços os preços do excel e da API foi encontrada']}), incluir_header=False)
+            wb.save(param_fonte)
 
+    # executando as etapas
     df_api = etapa_a(arquivo_destino, param_aba_fonte='top_5')
-    teste_b(df_api, arquivo_destino, param_aba_fonte='top_5')
+    etapa_b(df_api, arquivo_destino, param_aba_fonte='top_5')
+
+# executando os testes
 teste_1()
 teste_2()
 teste_3()
